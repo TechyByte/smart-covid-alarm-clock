@@ -8,6 +8,8 @@ import sched
 import time
 from app.announcement import announcement
 from app.utils import get_current_weather, get_current_news
+import threading
+import datetime
 
 alarms = [objects.Alarm()]
 s = sched.scheduler(time.time, time.sleep)
@@ -54,11 +56,17 @@ def index():
     form = AddAlarm()
 
     if form.title.data is not None:
-        alarms.append(objects.Alarm(form.trigger_datetime.raw_data[0], form.silent.data, form.title.data, "Content", form.news.data, form.weather.data))
-        logging.debug("Scheduling announcement")
-        s.enter(10, 1, announcement)
-        logging.debug("Queued")
-        s.run(blocking=False)
+        new_alarm = objects.Alarm(form.trigger_datetime.raw_data[0], form.silent.data, form.title.data, "Content", form.news.data, form.weather.data)
+        if not form.silent.data:
+            now = time.time()
+            dtnow = datetime.datetime.now()
+            seconds_delay = (new_alarm.dt - dtnow).total_seconds()
+            logging.debug("Scheduling announcement")
+            s.enterabs(now+seconds_delay, 1, announcement, argument=(new_alarm.news, new_alarm.weather, ))
+            logging.debug("Queued")
+            t = threading.Thread(target=s.run)
+            t.start()
+        alarms.append(new_alarm)
         logging.debug("Alarm created: " + form.title.data)
         return redirect("/")
 
